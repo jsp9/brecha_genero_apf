@@ -1,0 +1,375 @@
+---
+title: "Análisis de Salarios Adimistración pública federal"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = T, fig.width=12, fig.height=12)
+ 
+library(data.table)
+library(ggplot2)
+library(tidytext)
+library(ggrepel)
+library(SnowballC)
+```
+
+
+```{r carga, warning=FALSE}
+
+library(data.table)
+data<-fread('http://datos.cide.edu/bitstream/handle/10089/17413/BD.txt?sequence=2&isAllowed=y', sep = '\t')
+
+
+data<-data[,c( 'NombredelCargo', 'NombredelCargoSuperior',"DEP",  "CVE_DEP", "NivelJerárquico",
+              "ClavedelPuesto", "NombredelPuesto",
+              "ID","Nombre","PrimerApellido", "SegundoApellido","Genero",
+              'Vehículo',
+              'Celular',
+              'Alimentos',
+              'Vacante',
+              'TotalNetasRecode', 'PuestoReferencia',  'UnidadAdministrativa')]
+
+data<-data[data$Vacante==0,]
+data<-data[data$Genero!=3,]
+data$mujer<-data$Genero==2
+
+data$Vehículo<-tolower(data$Vehículo)
+
+
+filtro<-names(head(table(data$Vehículo)[order(table(data$Vehículo), decreasing = T)], 6))
+data$coche_bool<-data$Vehículo %in% filtro
+data$Celular<-tolower(data$Celular)
+filtro<- grepl("no |''", data$Celular)
+data$Celular_bool<-grepl("no |''", data$Celular)
+data$Alimentos<-tolower(data$Alimentos)
+data$Alimentos_bool<-grepl("no |''", data$Alimentos)
+
+```
+
+
+```{r proporcion_procesa}
+
+prop_sec<-aggregate(data=data, mujer~DEP, mean)
+
+prop_sec$mujer<-prop_sec$mujer*100
+
+secs<-prop_sec$DEP[order(prop_sec$mujer)]
+
+prop_sec$DEP<-factor(prop_sec$DEP, levels = secs)
+
+check<-aggregate(data=data, TotalNetasRecode~PuestoReferencia, mean)
+puestos<-check$PuestoReferencia[order(check$TotalNetasRecode)]
+
+```
+
+Vemos disparidad en la proporción de empleadas mujeres. De SEMAR con 0%, a Cultur con 49%. Ninguna secretaría rebasa el 50%.
+
+```{r grafica_proporcion}
+ggplot(data=prop_sec, aes(x=DEP, y=mujer))+
+  geom_bar(stat = 'identity')+
+  ggtitle('Proporción de mujeres empleadas por secretaría', subtitle = 'Incluye de Enlace a Secretario')+
+  geom_text(aes(x=DEP, y=mujer+2, label=paste0(round(mujer), "%")), size=4,
+            position = position_dodge(width = 0.5))+
+  theme_classic()+
+  theme(text = element_text(size = 20), axis.title = element_blank(), axis.text.x = element_text(angle = -45))
+```
+
+```{r procesa_propocion_puesto}
+puesto<-aggregate(data=data, mujer~PuestoReferencia, mean)
+puesto$mujer<-puesto$mujer*100
+
+puesto$PuestoReferencia<-factor(puesto$PuestoReferencia, levels=puestos)
+puesto<-puesto[!puesto$PuestoReferencia %in% c("",  "PRESIDENTE DE LA REPÚBLICA" ),]
+levels(puesto$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
+                           'DA', 'DGA','DG','JU','OM', 'Subsec.',
+                           'Srio.', 'Presi')
+
+
+
+```
+
+
+
+
+```{r grafica_proporcion_puesto}
+ggplot(data=puesto, aes(x=PuestoReferencia, y=mujer))+
+  geom_bar(stat = 'identity')+
+  ggtitle('Proporción de mujeres empleadas por puesto de referencia')+
+  geom_text(aes(x=PuestoReferencia, y=mujer+1, label=paste0(round(mujer), "%")), size=5,
+            position = position_dodge(width = 0.5))+
+  theme_classic()+
+  theme(text = element_text(size = 20), axis.title = element_blank(), axis.text.x = element_text(angle = -90))
+```
+
+
+
+ekfwoejrpwf
+```{r procesa_dist_jefes}
+
+jefes<-data[, c('NombredelCargoSuperior', 'mujer', 'ID', 'PrimerApellido', 'SegundoApellido', 'UnidadAdministrativa', 'DEP')]
+
+
+names(jefes)<-c('NombredelCargo', 'mujer_jefe','ID_jefe', 'PrimerApellido_jefe',  'SegundoApellido_jefe',  'UnidadAdministrativa', 'DEP')
+
+
+
+match_jefes<-merge(jefes, data, by=c('NombredelCargo', 'UnidadAdministrativa', 'DEP'))
+
+prob_mujer<-table(match_jefes$mujer, match_jefes$mujer_jefe, match_jefes$PuestoReferencia)
+
+prob_mujer<-as.data.frame(prob_mujer)
+names(prob_mujer)<-c('empleado_mujer','jefe_mujer', 'PuestoReferencia', 'prob')
+
+prob_mujer<-do.call(rbind.data.frame, lapply(split(prob_mujer, list(prob_mujer$jefe_mujer, prob_mujer$PuestoReferencia)),
+                   function(x) data.frame(x, prob=x$prob*100/sum(x$prob))))
+
+prob_mujer<-prob_mujer[, c('empleado_mujer', 'jefe_mujer','PuestoReferencia', 'prob.1' )]
+names(prob_mujer)<-c('empleado_mujer', 'jefe_mujer','PuestoReferencia', 'prob')
+
+prob_mujer$PuestoReferencia<-factor(prob_mujer$PuestoReferencia, levels=puestos)
+prob_mujer<-prob_mujer[!prob_mujer$PuestoReferencia %in% c("SECRETARIO DE ESTADO" , "" ),]
+
+levels(prob_mujer$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
+                           'DA', 'DGA','DG','JU','OM', 'Subsec.',
+                           'Srio.', 'Presi')
+
+
+prob_mujer<-prob_mujer[prob_mujer$empleado_mujer==T,]
+
+
+
+
+```
+
+
+
+
+
+```{r}
+data_nombres<-data
+
+limpia_apellidos<-function(str){
+  gsub(pattern = ' ',replacement = '',  iconv(tolower(str), to = "ASCII//TRANSLIT"))
+}
+
+data_nombres$PrimerApellido<-limpia_apellidos(data$PrimerApellido)
+data_nombres$SegundoApellido<-limpia_apellidos(data$SegundoApellido)
+
+data_nombres$full_apellido<-paste(data$PrimerApellido, data$SegundoApellido)
+
+data_nombres<-unnest_tokens(tbl = data_nombres, input=full_apellido, output = ap) 
+```
+
+```{r}
+
+
+n_nombres<-aggregate(data=data_nombres, rep(1, nrow(data_nombres))~ap+PuestoReferencia, sum)
+names(n_nombres)<-c('ap', 'PuestoReferencia', 'n')
+n_total<-aggregate(data=data_nombres, rep(1, nrow(data_nombres))~ap, sum)
+names(n_total)<-c('ap', 'total')
+nombres_sec<-merge(n_nombres, n_total, by='ap')
+
+nombres_sec$prob<-nombres_sec$n/nombres_sec$total
+nombres_sec<-bind_tf_idf(nombres_sec, ap, PuestoReferencia, n)
+```
+
+
+```{r}
+
+nombres_puestos<-lapply(split(nombres_sec, nombres_sec$PuestoReferencia), function(x) head(x[order(x$tf_idf, decreasing=T),], 15))
+
+
+nombres_puestos<-do.call(rbind.data.frame, lapply(nombres_puestos, function(x) data.frame(x, tf_idf_norm=x$tf_idf/sum(x$tf_idf))))
+
+nombres_puestos$PuestoReferencia<-factor(nombres_puestos$PuestoReferencia, levels=puestos)
+nombres_puestos<-nombres_puestos[!nombres_puestos$PuestoReferencia %in% c('PRESIDENTE DE LA REPÚBLICA', "SECRETARIO DE ESTADO" , "" ),]
+
+levels(nombres_puestos$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
+                           'DA', 'DGA','DG','JU','OM', 'Subsec.',
+                           'Srio.', 'Presi')
+
+
+
+```
+
+
+APF dominada por ciertos apellidos
+
+```{r}
+
+
+ggplot(data=nombres_puestos) +
+  aes(x = 1, y = 1, size = tf_idf_norm/15, label = ap, color=tf_idf_norm/15) +
+  geom_text_repel(segment.size = 0, force = 50) +
+  scale_size(range = c(2, 15), guide = FALSE) +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(breaks = NULL) +
+  labs(x = '', y = '') +
+  theme_classic()+
+  theme(legend.position = 'none')+
+  facet_wrap(~PuestoReferencia)
+
+```
+
+
+```{r}
+#
+data_cargos<-data
+data_cargos$NombredelCargo<-trimws(iconv(tolower(data_cargos$NombredelCargo), to = "ASCII//TRANSLIT"), which = 'both')
+
+data_cargos$NombredelCargo<-gsub(pattern = '[0-9]+',
+                                 replacement = '',
+                                 as.character(data_cargos$NombredelCargo))
+
+data_cargos<-unnest_tokens(tbl = data_cargos, input=NombredelCargo, output = ap)
+data_cargos$ap<-wordStem(data_cargos$ap, language = 'es')
+n_nombres<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap+mujer, sum)
+names(n_nombres)<-c('ap', 'mujer', 'n')
+n_total<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap, sum)
+names(n_total)<-c('ap', 'total')
+nombres_sec<-merge(n_nombres, n_total, by='ap')
+
+nombres_sec$prob<-nombres_sec$n/nombres_sec$total
+nombres_sec<-bind_tf_idf(nombres_sec, ap, mujer, n)
+
+
+```
+
+
+```{r}
+nombres_puestos<-lapply(split(nombres_sec, list(nombres_sec$mujer)),
+                        function(x) head(x[order(x$tf_idf, decreasing=T),], 100))
+
+
+nombres_puestos<-do.call(rbind.data.frame, lapply(nombres_puestos, function(x) data.frame(x, tf_idf_norm=x$tf_idf/sum(x$tf_idf))))
+nombres_puestos$mujer<-ifelse(nombres_puestos$mujer, 'Trabajadoras', 'Trabajadores')
+```
+
+
+```{r}
+
+ggplot(data=nombres_puestos) +
+      aes(x = 1, y = 1, size = tf_idf_norm, label = ap, color=mujer) +
+        geom_text_repel(segment.size = 0, force = 150) +
+          scale_size(range = c(5, 15), guide = FALSE) +
+          scale_y_continuous(breaks = NULL) +
+          scale_x_continuous(breaks = NULL) +
+          labs(x = '', y = '') +
+          
+      theme_classic()+
+      theme(legend.position = 'none', text = element_text(size=20))+
+      facet_wrap(~mujer)
+
+
+```
+
+```{r}
+
+
+sueldos<-aggregate(data=data, TotalNetasRecode~PuestoReferencia+DEP+mujer, function(x) c(mean(x), sd(x), length(x)))
+sueldos<-do.call(cbind.data.frame,sueldos )
+
+names(sueldos)<-c('PuestoReferencia','DEP', 'mujer','media', 'sd', 'n')
+
+sueldos$ub<-sueldos$media+(sueldos$sd/sqrt(sueldos$n))
+sueldos$lb<-sueldos$media-(sueldos$sd/sqrt(sueldos$n))
+sueldos$PuestoReferencia<-factor(sueldos$PuestoReferencia, levels=puestos)
+
+dif_porc<-dcast(sueldos, PuestoReferencia+DEP~mujer, value.var='media')
+
+dif_porc<-dif_porc[!dif_porc$PuestoReferencia %in% c("", "OFICIAL MAYOR" , "SECRETARIO DE ESTADO" ,
+                                          "PRESIDENTE DE LA REPÚBLICA" ),]
+names(dif_porc)<-c('Puesto','Dependencia', 'Hombre', 'Mujer')
+dif_porc$dif<-(dif_porc$Hombre-dif_porc$Mujer)/dif_porc$Hombre*100
+
+dif_porc$signo<-ifelse(dif_porc$dif>0, 'Hombres ganan más', 'Mujeres ganan más')
+dif_porc<-dif_porc[!dif_porc$Dependencia %in% c('SEDENA', 'SEMAR'),]
+
+levels(dif_porc$Puesto)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
+                           'DA', 'DGA','DG','JU','OM', 'Subsec.',
+                           'Srio.', 'Presi')
+
+
+```
+
+```{r}
+
+ggplot(data = dif_porc,
+       aes(x=Puesto, y=dif, fill=signo))+
+  geom_bar(stat = 'identity')+
+  geom_text(aes(x=Puesto, y=dif+1, label=paste0(round(dif), "%")), size=5,
+            position = position_dodge(width = 0.5))+
+  geom_hline(yintercept = 0)+
+  facet_wrap('Dependencia')+
+  theme_classic()+
+  theme(text = element_text(size = 20), axis.title = element_blank(), axis.text.x = element_text(angle = -45),
+        axis.text.y = element_blank(), legend.title = element_blank(), legend.position = 'top')+
+  ggtitle('Diferencia porcentual de salarios \n Por secretaría y puesto de referencia', subtitle = 'Hombres-Mujeres')
+
+
+```
+
+
+qué hacer?
+
+```{r}
+
+ggplot(data=prob_mujer, aes(x=PuestoReferencia, y=prob, group=jefe_mujer, fill=jefe_mujer))+
+  geom_bar(stat = 'identity', position = position_dodge())+
+  labs(title='Probabilidad de contratar a una mujer',
+          subtitle = 'por género del sexo del puesto superior',
+          caption='\t\t\tSólo se incluyen empleados cuyo puesto superior es identificable')+
+  geom_text(aes(x=PuestoReferencia,, group=jefe_mujer, y=prob+1, label=paste0(round(prob), "%")), size=5,
+            position = position_dodge(width = 1))+
+  theme_classic()+
+  scale_fill_manual(labels = c('Jefe', 'Jefa'), values = c('blue', 'red'))+
+  theme(text = element_text(size = 20),
+        axis.title = element_blank(),
+        axis.text.x = element_text(angle = -90), legend.title = element_blank())
+
+```
+
+
+```{r warning=F, error=F, include=F}
+salario_por_jefe<-aggregate(data=match_jefes, TotalNetasRecode~mujer+mujer_jefe+PuestoReferencia, mean)
+salario_por_jefe$mujer<-ifelse(salario_por_jefe$mujer, 'empleada', 'empleado')
+salario_por_jefe$mujer_jefe<-ifelse(salario_por_jefe$mujer_jefe, 'jefa', 'jefe')
+
+salario_por_jefe<-dcast(salario_por_jefe, PuestoReferencia~mujer+mujer_jefe)
+
+salario_por_jefe$dif_jefa<-(((salario_por_jefe$empleado_jefa-salario_por_jefe$empleada_jefa)/salario_por_jefe$empleado_jefa))*100
+salario_por_jefe$dif_jefe<-((salario_por_jefe$empleado_jefe-salario_por_jefe$empleada_jefe)/(salario_por_jefe$empleado_jefe))*100
+
+salario_por_jefe<-melt(salario_por_jefe[,c('dif_jefe', 'dif_jefa', 'PuestoReferencia')])
+
+
+
+salario_por_jefe$PuestoReferencia<-factor(salario_por_jefe$PuestoReferencia, levels=puestos)
+salario_por_jefe<-salario_por_jefe[!salario_por_jefe$PuestoReferencia %in% c("SECRETARIO DE ESTADO" , "" ),]
+
+levels(salario_por_jefe$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
+                           'DA', 'DGA','DG','JU','OM', 'Subsec.',
+                           'Srio.', 'Presi')
+
+
+
+
+```
+
+
+```{r}
+ggplot(data=salario_por_jefe,
+       aes(x=PuestoReferencia, y=value, group=variable, fill=variable))+
+         geom_bar(stat = 'identity', position = position_dodge(width = 1))+
+  geom_text(aes(x=PuestoReferencia,group=variable,  y=value, label=paste0(round(value, 1), "%")), size=5,
+            position = position_dodge(width = 1))+
+  ggtitle('Diferencia salarial porcentual promedio', subtitle = '($Mujer-$Hombre)\npor género del puesto superior')+
+  theme_classic()+
+  scale_fill_manual(labels = c('Jefe', 'Jefa'), values = c('blue', 'red'))+
+   theme(text = element_text(size = 20),
+        axis.title = element_blank(),
+        axis.text.x = element_text(angle = -90), legend.title = element_blank())
+
+```
+
+
