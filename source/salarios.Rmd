@@ -19,11 +19,11 @@ capaces) explica los 23 centavos adicionales que gana cada hombre por dólar.
 Para contribuir al debate sobre la brecha salarial de género, decidimos echarle un vistazo a los
 datos que existen sobre sueldos y género de uno de los sectores donde esto debería ser cosa
 del pasado; el público. En este sentido, hicimos un análisis de la base “Remuneraciones por
-género en la Administración Pública Federal” �para identificar si una servidora pública en Mexico
+género en la Administración Pública Federal” ?para identificar si una servidora pública en Mexico
 también gana 77 centavos por cada peso que gana su contraparte masculina. Como se
 adelantó en los primeros párrafos de este texto, el tema no es sencillo y la discriminación (al
 menos no como la imaginamos) no explica por si sola que las mujeres sigan rezagadas en el
-ámbito profesional.
+ámbito profesional .
 
 
 ```{r setup, include=FALSE}
