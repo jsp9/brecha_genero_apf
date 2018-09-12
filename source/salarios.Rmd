@@ -1,7 +1,30 @@
 ---
-title: "Análisis de Salarios Adimistración pública federal"
+title: "El economista miope y la brecha de género en el sector público"
 output: html_document
 ---
+
+Recientemente, un célebre catedrático del Instituto Tecnológico Autónomo de Mexico (ITAM)
+escribió un tuit bastante desafortunado. En el tuit, el Doctor Isaac Katz citaba una investigación
+sobre la brecha salarial de género cuyo hallazgo principal era que las mujeres con hijos ganan
+considerablemente menos que sus contrapartes sin hijos. Para el profesor, que claramente no
+es feminista, el estudio era una prueba irrefutable de que no existe la discriminación laboral por
+sexismo. El tema es que se embaracen, no que sean mujeres, escribió Katz. Si no quieren
+ganar menos, no tengan hijos. Cuestión de prioridades.
+Sin lugar a dudas, en esos 140 caracteres, Isaac Katz estaba siendo misógino y miope, pero no
+queremos que ese sea el foco principal de este artículo. Lo importante es que, probablemente
+sin quererlo, el académico también estaba revelando la complejidad que existe detrás de la
+brecha de salarial por género. Aunque usted no lo crea, es cierto que no solo la discriminación,
+(o la discriminación en forma de jefes que no contratan mujeres por considerarlas menos
+capaces) explica los 23 centavos adicionales que gana cada hombre por dólar.
+Para contribuir al debate sobre la brecha salarial de género, decidimos echarle un vistazo a los
+datos que existen sobre sueldos y género de uno de los sectores donde esto debería ser cosa
+del pasado; el público. En este sentido, hicimos un análisis de la base “Remuneraciones por
+género en la Administración Pública Federal” �para identificar si una servidora pública en Mexico
+también gana 77 centavos por cada peso que gana su contraparte masculina. Como se
+adelantó en los primeros párrafos de este texto, el tema no es sencillo y la discriminación (al
+menos no como la imaginamos) no explica por si sola que las mujeres sigan rezagadas en el
+ámbito profesional.
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = F, cache = T, fig.width=12, fig.height=12)
@@ -14,7 +37,7 @@ library(SnowballC)
 ```
 
 
-```{r carga, warning=FALSE}
+```{r carga, warning=FALSE, include=FALSE}
 
 library(data.table)
 data<-fread('http://datos.cide.edu/bitstream/handle/10089/17413/BD.txt?sequence=2&isAllowed=y', sep = '\t')
@@ -46,8 +69,23 @@ data$Alimentos_bool<-grepl("no |''", data$Alimentos)
 
 ```
 
+```{r mediana, include=FALSE}
 
-```{r proporcion_procesa}
+medianas<-unlist(as.list(by(data = data, INDICES = data$mujer,FUN =  function(x) median(x$TotalNetasRecode))))
+names(medianas)<-c('hombre', 'mujer')
+
+
+```
+
+Tanto en el caso de E.U. como en el mexicano, los 77 centavos por dolar no implican desigualdad por discriminación en su totalidad. La diferencia no es observada por el mismo trabajo. Al menos en los estudios sistemáticos realizados, las mujeres tienden a seleccionar trabajos menos demandantes en términos de tiempo y disponibilidad, pues sólo de esta forma pueden cumplir con las responsabilidades familiares impuestas socialmente.
+
+En la Administración Pública Federal México, las mujeres ganan `r round((medianas['mujer']/medianas['hombre'])*100)` centavos por cada peso que gana un hombre. Si bien este número es más paritario que el encontrado en Estados Unidos, esconde una complejidad tremenda, que intentaremos ilustrar en este artículo. 
+
+## Desproporcionalidad en contrataciones
+
+Lo primero que podemos ver es que las mujeres tienden a estar encasilladas en ciertos perfiles dentro de la administración pública. Por ejemplo, la secretaría que más mujeres tiene contratada es la Secretaría de Cultura, mientras que las dos que menos tienen son SEDENA y SEMAR. Es importante notar que, ni siquiera la secretaría con más mujeres, alcanza el 50% de contrataciones.
+
+```{r proporcion_procesa, include=FALSE}
 
 prop_sec<-aggregate(data=data, mujer~DEP, mean)
 
@@ -62,7 +100,7 @@ puestos<-check$PuestoReferencia[order(check$TotalNetasRecode)]
 
 ```
 
-Vemos disparidad en la proporción de empleadas mujeres. De SEMAR con 0%, a Cultur con 49%. Ninguna secretaría rebasa el 50%.
+
 
 ```{r grafica_proporcion}
 ggplot(data=prop_sec, aes(x=DEP, y=mujer))+
@@ -88,7 +126,7 @@ levels(puesto$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
 
 ```
 
-
+De manera similar a los estudios de E.U., las mujeres en la administración pública mexicana tienden a estar en puestos con menos responsabilidades. Esto puede deberse a que los puestos más altos tienden a conllevar largas jornadas, para las cuales una mujer con muchas responsabilidades familiares tiene muchos más costos para cubir.
 
 
 ```{r grafica_proporcion_puesto}
@@ -173,6 +211,8 @@ nombres_sec$prob<-nombres_sec$n/nombres_sec$total
 nombres_sec<-bind_tf_idf(nombres_sec, ap, PuestoReferencia, n)
 ```
 
+A diferencia del sector privado, en el sector público podemos ubicar a los responsables de las contrataciones muy fácilmente. Es relativamente sencillo ubicar a quiénes están encargados de paliar esta despropoción. Específicamente, podemos ver ciertos apellidos concentrados en puestos altos de la administración. A continuación, tenemos los apellidos más representativos por escalafón de paga en la Administración Pública Federal:
+
 
 ```{r}
 
@@ -193,7 +233,6 @@ levels(nombres_puestos$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
 ```
 
 
-APF dominada por ciertos apellidos
 
 ```{r}
 
@@ -220,14 +259,16 @@ data_cargos$NombredelCargo<-trimws(iconv(tolower(data_cargos$NombredelCargo), to
 data_cargos$NombredelCargo<-gsub(pattern = '[0-9]+',
                                  replacement = '',
                                  as.character(data_cargos$NombredelCargo))
+data_cargos$NombredelCargo<-gsub('[[:punct:] ]+',' ',as.character(data_cargos$NombredelCargo))
+
 
 data_cargos<-unnest_tokens(tbl = data_cargos, input=NombredelCargo, output = ap)
-data_cargos$ap<-wordStem(data_cargos$ap, language = 'es')
-n_nombres<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap+mujer, sum)
-names(n_nombres)<-c('ap', 'mujer', 'n')
-n_total<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap, sum)
-names(n_total)<-c('ap', 'total')
-nombres_sec<-merge(n_nombres, n_total, by='ap')
+#data_cargos$ap<-wordStem(data_cargos$ap, language = 'es')
+n_nombres<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap+mujer+DEP, sum)
+names(n_nombres)<-c('ap', 'mujer','DEP',  'n')
+n_total<-aggregate(data=data_cargos, rep(1, nrow(data_cargos))~ap+DEP, sum)
+names(n_total)<-c('ap', 'DEP', 'total')
+nombres_sec<-merge(n_nombres, n_total, by=c('ap', 'DEP'))
 
 nombres_sec$prob<-nombres_sec$n/nombres_sec$total
 nombres_sec<-bind_tf_idf(nombres_sec, ap, mujer, n)
@@ -237,8 +278,8 @@ nombres_sec<-bind_tf_idf(nombres_sec, ap, mujer, n)
 
 
 ```{r}
-nombres_puestos<-lapply(split(nombres_sec, list(nombres_sec$mujer)),
-                        function(x) head(x[order(x$tf_idf, decreasing=T),], 100))
+nombres_puestos<-lapply(split(nombres_sec, list(nombres_sec$mujer, nombres_sec$DEP)),
+                        function(x) head(x[order(x$tf_idf, decreasing=T),], 20))
 
 
 nombres_puestos<-do.call(rbind.data.frame, lapply(nombres_puestos, function(x) data.frame(x, tf_idf_norm=x$tf_idf/sum(x$tf_idf))))
@@ -246,11 +287,16 @@ nombres_puestos$mujer<-ifelse(nombres_puestos$mujer, 'Trabajadoras', 'Trabajador
 ```
 
 
-```{r}
+## Palabras más comunes en puestos por género
 
-ggplot(data=nombres_puestos) +
-      aes(x = 1, y = 1, size = tf_idf_norm, label = ap, color=mujer) +
-        geom_text_repel(segment.size = 0, force = 150) +
+### PGR
+
+```{r , fig.height = 15, fig.width = 25, fig.align = "center"}
+
+ggplot(data=nombres_puestos[nombres_puestos$DEP=='PGR',]) +
+      aes(x = abs(tf_idf_norm)+1, y = abs(tf_idf_norm)+1,
+          size = tf_idf_norm, label = ap, color=mujer) +
+        geom_text_repel(segment.size = 0, force = 250) +
           scale_size(range = c(5, 15), guide = FALSE) +
           scale_y_continuous(breaks = NULL) +
           scale_x_continuous(breaks = NULL) +
@@ -260,8 +306,52 @@ ggplot(data=nombres_puestos) +
       theme(legend.position = 'none', text = element_text(size=20))+
       facet_wrap(~mujer)
 
-
 ```
+
+
+
+### SEDESOL
+
+```{r , fig.height = 15, fig.width = 25, fig.align = "center"}
+
+ggplot(data=nombres_puestos[nombres_puestos$DEP=='SEDESOL',]) +
+      aes(x = abs(tf_idf_norm)+1, y = abs(tf_idf_norm)+1,
+          size = tf_idf_norm, label = ap, color=mujer) +
+        geom_text_repel(segment.size = 0, force = 250) +
+          scale_size(range = c(5, 15), guide = FALSE) +
+          scale_y_continuous(breaks = NULL) +
+          scale_x_continuous(breaks = NULL) +
+          labs(x = '', y = '') +
+          
+      theme_classic()+
+      theme(legend.position = 'none', text = element_text(size=20))+
+      facet_wrap(~mujer)
+```
+
+### SSA
+
+```{r , fig.height = 15, fig.width = 25, fig.align = "center"}
+
+ggplot(data=nombres_puestos[nombres_puestos$DEP=='SSA',]) +
+      aes(x = abs(tf_idf_norm)+1, y = abs(tf_idf_norm)+1,
+          size = tf_idf_norm, label = ap, color=mujer) +
+        geom_text_repel(segment.size = 0, force = 250) +
+          scale_size(range = c(5, 15), guide = FALSE) +
+          scale_y_continuous(breaks = NULL) +
+          scale_x_continuous(breaks = NULL) +
+          labs(x = '', y = '') +
+          
+      theme_classic()+
+      theme(legend.position = 'none', text = element_text(size=20))+
+      facet_wrap(~mujer)
+```
+
+## Diferencias salariales
+
+
+
+
+
 
 ```{r}
 
@@ -310,7 +400,7 @@ ggplot(data = dif_porc,
 ```
 
 
-qué hacer?
+## She for she
 
 ```{r}
 
@@ -319,8 +409,7 @@ ggplot(data=prob_mujer, aes(x=PuestoReferencia, y=prob, group=jefe_mujer, fill=j
   labs(title='Probabilidad de contratar a una mujer',
           subtitle = 'por género del sexo del puesto superior',
           caption='\t\t\tSólo se incluyen empleados cuyo puesto superior es identificable')+
-  geom_text(aes(x=PuestoReferencia,, group=jefe_mujer, y=prob+1, label=paste0(round(prob), "%")), size=5,
-            position = position_dodge(width = 1))+
+  geom_text(aes(x=PuestoReferencia, group=jefe_mujer, y=prob+1, label=paste0(round(prob), "%")), size=5,position = position_dodge(width = 1))+
   theme_classic()+
   scale_fill_manual(labels = c('Jefe', 'Jefa'), values = c('blue', 'red'))+
   theme(text = element_text(size = 20),
