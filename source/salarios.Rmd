@@ -348,8 +348,61 @@ ggplot(data=nombres_puestos[nombres_puestos$DEP=='SSA',]) +
 
 ## Diferencias salariales
 
+```{r}
+
+sueldos<-aggregate(data=data, TotalNetasRecode~DEP+mujer, function(x) c(mean(x), sd(x), length(x)))
+sueldos<-do.call(cbind.data.frame,sueldos )
+
+names(sueldos)<-c('DEP', 'mujer','media', 'sd', 'n')
+
+sueldos$ub<-sueldos$media+(sueldos$sd/sqrt(sueldos$n))
+sueldos$lb<-sueldos$media-(sueldos$sd/sqrt(sueldos$n))
+#sueldos$PuestoReferencia<-factor(sueldos$PuestoReferencia, levels=puestos)
+
+dif_porc<-dcast(sueldos, DEP~mujer, value.var='media')
 
 
+names(dif_porc)<-c('Dependencia', 'Hombre', 'Mujer')
+dif_orden<-dif_porc$Hombre-dif_porc$Mujer
+
+names(dif_orden)<-dif_porc$Dependencia
+
+
+dif_porc<-dif_porc[!dif_porc$Dependencia %in% c('SEDENA', 'SEMAR'),]
+dif_porc<-melt(dif_porc[, c('Dependencia', 'Hombre', 'Mujer')], id.vars='Dependencia')
+
+dif_orden<-names(dif_orden)[order(dif_orden)]
+dif_porc$Dependencia<-factor(dif_porc$Dependencia, levels = dif_orden)
+
+```
+
+```{r}
+
+ggplot(data=dif_porc, aes(x=Dependencia, y=value, group=variable, fill=variable))+
+  geom_bar(position = position_dodge(), stat = 'identity')+
+  scale_fill_manual(labels=c('Hombres', 'Mujeres'), values=c('blue', 'red'))+
+  coord_flip()+
+  theme_classic()+
+  ylab('Salario promedio')+
+  scale_y_continuous(labels = function(x) prettyNum(paste0('$', round(x) ), big.mark = ','))+
+  theme(text = element_text(size = 20), legend.title = element_blank())+
+  ggtitle('Salario promedio por género y dependencia', subtitle = 'Ordenados por brecha de género' )
+
+```
+
+```{r}
+prop_mujeres<-aggregate(data=data, mujer~NombredelCargo, function(x) c(mean(x), length(x)))
+
+prop_mujeres<-do.call(cbind.data.frame, prop_mujeres)
+
+prop_mujeres<-prop_mujeres[prop_mujeres$mujer.2>=30,]
+
+prop_mujeres<-prop_mujeres[order(prop_mujeres$mujer.1),]
+
+head(prop_mujeres)
+tail(prop_mujeres)
+
+```
 
 
 
@@ -406,9 +459,9 @@ ggplot(data = dif_porc,
 
 ggplot(data=prob_mujer, aes(x=PuestoReferencia, y=prob, group=jefe_mujer, fill=jefe_mujer))+
   geom_bar(stat = 'identity', position = position_dodge())+
-  labs(title='Probabilidad de contratar a una mujer',
-          subtitle = 'por género del sexo del puesto superior',
-          caption='\t\t\tSólo se incluyen empleados cuyo puesto superior es identificable')+
+  labs(title='Porcentaje de mujeres por puesto',
+          subtitle = 'por género del jefe',
+          caption='Sólo se incluyen empleados cuyo puesto superior es identificable')+
   geom_text(aes(x=PuestoReferencia, group=jefe_mujer, y=prob+1, label=paste0(round(prob), "%")), size=5,position = position_dodge(width = 1))+
   theme_classic()+
   scale_fill_manual(labels = c('Jefe', 'Jefa'), values = c('blue', 'red'))+
@@ -439,8 +492,6 @@ salario_por_jefe<-salario_por_jefe[!salario_por_jefe$PuestoReferencia %in% c("SE
 levels(salario_por_jefe$PuestoReferencia)<-c('Enlace', 'Jefe. D.', 'Subir.', '',
                            'DA', 'DGA','DG','JU','OM', 'Subsec.',
                            'Srio.', 'Presi')
-
-
 
 
 ```
