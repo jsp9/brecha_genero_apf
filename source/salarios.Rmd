@@ -1,6 +1,6 @@
 ---
 title: "El economista miope y la brecha de género en el sector público"
-output: html_document
+output: word_document
 ---
 
 Recientemente, un célebre catedrático del Instituto Tecnológico Autónomo de Mexico (ITAM)
